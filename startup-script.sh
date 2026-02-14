@@ -139,6 +139,7 @@ cat > /app/src/docker-compose.override.yml << 'EOF'
 services:
   elixir:
     restart: unless-stopped
+    user: "1000:1000"
     volumes:
       - /data:/data
 EOF

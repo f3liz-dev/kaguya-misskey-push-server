@@ -29,8 +29,8 @@ WORKDIR /app
 COPY --from=builder /build/_build/prod/rel/push_server ./
 
 # Non-root user
-RUN adduser -S -D -H push
-RUN mkdir -p /data && chown push:push /data
+RUN adduser -S -D -H -G users push
+RUN mkdir -p /data && chown push:users /data
 USER push
 
 EXPOSE 4000

@@ -38,4 +38,7 @@ USER push
 
 EXPOSE 4000
 
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -sf http://localhost:4000/health || exit 1
+
 CMD ["./bin/push_server", "start"]

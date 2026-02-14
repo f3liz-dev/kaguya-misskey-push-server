@@ -22,9 +22,7 @@ services:
 
   # --- Elixir primary server ---
   elixir:
-    build:
-      context: ./elixir
-      dockerfile: Dockerfile
+    image: ghcr.io/f3liz-dev/kaguya-misskey-push-server-elixir:latest
     environment:
       - DB_PATH=/data/push_server.db
       - PORT=4000
@@ -36,18 +34,11 @@ services:
           memory: 256M
         reservations:
           memory: 128M
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:4000/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+    # Healthcheck defined in Dockerfile
 
   # --- Node.js fallback server ---
   node:
-    build:
-      context: ./node
-      dockerfile: Dockerfile
+    image: ghcr.io/f3liz-dev/kaguya-misskey-push-server-node:latest
     environment:
       - DB_PATH=/data/push_server.db
       - FALLBACK_PORT=3000
@@ -62,12 +53,7 @@ services:
           memory: 128M
         reservations:
           memory: 64M
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:3000/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    # Healthcheck defined in Dockerfile
 
   # --- Nginx reverse proxy ---
   nginx:
@@ -84,8 +70,7 @@ services:
       node:
         condition: service_healthy
       elixir:
-        condition: service_started  # start nginx even if elixir not healthy yet
-                                    # node is the fallback — nginx needs node healthy
+        condition: service_healthy
 networks:
   internal:
     driver: bridge

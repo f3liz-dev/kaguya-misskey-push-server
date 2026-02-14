@@ -1,0 +1,18 @@
+# docker-compose.override.yml
+# Override for local development - builds images locally instead of pulling from registry
+#
+# This file is automatically applied by docker-compose and overrides values in docker-compose.yml
+# For production, remove this file or use: docker-compose -f docker-compose.yml up
+
+services:
+  elixir:
+    build:
+      context: ./elixir
+      dockerfile: Dockerfile
+    image: kaguya-misskey-push-server-elixir:local
+
+  node:
+    build:
+      context: ./node
+      dockerfile: Dockerfile
+    image: kaguya-misskey-push-server-node:local

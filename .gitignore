@@ -9,3 +9,4 @@ deps/
 node_modules/
 .elixir_ls/
 .mix/
+docker-compose.override.yml

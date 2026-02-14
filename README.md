@@ -24,6 +24,14 @@ This server
 
 ## Deployment
 
+### Docker Images
+
+Pre-built images are available on GitHub Container Registry:
+- `ghcr.io/f3liz-dev/kaguya-misskey-push-server-elixir:latest`
+- `ghcr.io/f3liz-dev/kaguya-misskey-push-server-node:latest`
+
+Images are automatically built and pushed on every commit to main.
+
 ### GCE e2-micro (recommended)
 
 1. Generate VAPID keys: `npx web-push generate-vapid-keys`
@@ -31,9 +39,20 @@ This server
 3. Store in GCP Secret Manager: `gcloud secrets create push-server-env --data-file=.env`
 4. Create instance with `startup-script.sh` (see comments in file for full command)
 
+The startup script will automatically pull the latest images from GitHub Container Registry.
+
 ### Docker Compose (dev/alternative)
 
+For production (uses pre-built images):
 ```bash
+cp .env.example .env
+# Fill in VAPID keys
+docker compose up -d
+```
+
+For local development (builds images locally):
+```bash
+cp docker-compose.override.yml.example docker-compose.override.yml
 cp .env.example .env
 # Fill in VAPID keys
 docker compose up -d

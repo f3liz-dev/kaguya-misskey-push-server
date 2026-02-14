@@ -30,8 +30,9 @@ defmodule PushServer.Web.Router do
          true <- secret_header == user["webhook_secret"],
          {:ok, payload} <- PushServer.Payload.build(conn.body_params, user["notification_preference"]) do
       
-      delay = if user["supporter"] == 1, do: user["delay_minutes"], else: max(user["delay_minutes"], 1)
-      deliver_at = DateTime.utc_now() |> DateTime.add(delay * 60, :second)
+      # Use buffer_seconds for collection time (0-600s), default to 60s
+      buffer_seconds = Map.get(user, "buffer_seconds", 60)
+      deliver_at = DateTime.utc_now() |> DateTime.add(buffer_seconds, :second)
       
       :telemetry.execute([:push_server, :webhook, :arrival], %{count: 1}, %{type: conn.body_params["type"]})
       PushServer.Buffer.insert(user_id, payload, deliver_at)

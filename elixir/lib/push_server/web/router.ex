@@ -73,9 +73,11 @@ defmodule PushServer.Web.Router do
     user_id = conn.body_params["user_id"]
     delay = conn.body_params["delay_minutes"]
     pref = conn.body_params["notification_preference"]
+    buffer = conn.body_params["buffer_seconds"]
 
     if delay, do: PushServer.Repo.update_delay(user_id, delay)
     if pref, do: PushServer.Repo.update_preference(user_id, pref)
+    if buffer, do: PushServer.Repo.update_buffer_seconds(user_id, buffer)
     
     send_json(conn, 200, %{ok: true})
   end
@@ -95,6 +97,11 @@ defmodule PushServer.Web.Router do
     missing = Enum.filter(required, fn key -> !Map.has_key?(p, key) end)
     
     if Enum.empty?(missing) do
+      buffer_seconds = case p["buffer_seconds"] do
+        val when is_integer(val) -> max(0, min(val, 600))
+        _ -> 60
+      end
+      
       {:ok, %{
         id: p["id"],
         misskey_origin: p["misskey_origin"],
@@ -102,7 +109,8 @@ defmodule PushServer.Web.Router do
         webhook_secret: p["webhook_secret"],
         push_subscription: p["push_subscription"],
         notification_preference: p["notification_preference"] || "quiet",
-        delay_minutes: p["delay_minutes"] || 1
+        delay_minutes: p["delay_minutes"] || 1,
+        buffer_seconds: buffer_seconds
       }}
     else
       Logger.warning("Missing required fields: #{inspect(missing)}")

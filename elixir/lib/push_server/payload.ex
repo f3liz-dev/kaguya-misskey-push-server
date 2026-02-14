@@ -57,7 +57,7 @@ defmodule PushServer.Payload do
   def summarize([single]), do: single
 
   def summarize(payloads) do
-    counts = Enum.frequencies_by(payloads, & &1.type)
+    counts = Enum.frequencies_by(payloads, & &1.data.type)
 
     body =
       counts

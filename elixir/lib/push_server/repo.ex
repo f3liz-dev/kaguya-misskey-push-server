@@ -15,6 +15,7 @@ defmodule PushServer.Repo do
   def deactivate_user(user_id), do: GenServer.call(__MODULE__, {:deactivate_user, user_id})
   def update_delay(user_id, delay), do: GenServer.call(__MODULE__, {:update_delay, user_id, delay})
   def update_preference(user_id, pref), do: GenServer.call(__MODULE__, {:update_preference, user_id, pref})
+  def update_buffer_seconds(user_id, seconds), do: GenServer.call(__MODULE__, {:update_buffer_seconds, user_id, seconds})
   def count_active_users(), do: GenServer.call(__MODULE__, :count_active_users)
 
   @impl true
@@ -33,9 +34,15 @@ defmodule PushServer.Repo do
         push_subscription TEXT NOT NULL,
         notification_preference TEXT NOT NULL DEFAULT 'quiet',
         delay_minutes INTEGER NOT NULL DEFAULT 1,
+        buffer_seconds INTEGER NOT NULL DEFAULT 60,
         supporter INTEGER NOT NULL DEFAULT 0,
         active INTEGER NOT NULL DEFAULT 1
       )
+    """, [])
+    
+    # Add buffer_seconds column if it doesn't exist (migration for existing DBs)
+    Exqlite.Basic.exec(db, """
+      ALTER TABLE users ADD COLUMN buffer_seconds INTEGER NOT NULL DEFAULT 60
     """, [])
 
     {:ok, db}
@@ -52,16 +59,18 @@ defmodule PushServer.Repo do
 
   def handle_call({:insert_user, user}, _from, db) do
     Logger.info("Repo: Attempting to insert/update user #{user.id}")
+    buffer_seconds = Map.get(user, :buffer_seconds, 60)
     res = Exqlite.Basic.exec(db, """
-      INSERT INTO users (id, misskey_origin, webhook_user_id, webhook_secret, push_subscription, notification_preference, delay_minutes, active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO users (id, misskey_origin, webhook_user_id, webhook_secret, push_subscription, notification_preference, delay_minutes, buffer_seconds, active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
       ON CONFLICT(id) DO UPDATE SET
         webhook_secret = excluded.webhook_secret,
         push_subscription = excluded.push_subscription,
         notification_preference = excluded.notification_preference,
         delay_minutes = excluded.delay_minutes,
+        buffer_seconds = excluded.buffer_seconds,
         active = 1
-    """, [user.id, user.misskey_origin, user.webhook_user_id, user.webhook_secret, Jason.encode!(user.push_subscription), user.notification_preference, user.delay_minutes])
+    """, [user.id, user.misskey_origin, user.webhook_user_id, user.webhook_secret, Jason.encode!(user.push_subscription), user.notification_preference, user.delay_minutes, buffer_seconds])
     
     case res do
       {:ok, _, _, _} -> 
@@ -99,6 +108,13 @@ defmodule PushServer.Repo do
 
   def handle_call({:update_preference, id, pref}, _from, db) do
     Exqlite.Basic.exec(db, "UPDATE users SET notification_preference = ? WHERE id = ?", [pref, id])
+    {:reply, :ok, db}
+  end
+
+  def handle_call({:update_buffer_seconds, id, seconds}, _from, db) do
+    # Clamp between 0 and 600 seconds (10 minutes)
+    clamped = max(0, min(seconds, 600))
+    Exqlite.Basic.exec(db, "UPDATE users SET buffer_seconds = ? WHERE id = ?", [clamped, id])
     {:reply, :ok, db}
   end
 

@@ -28,9 +28,9 @@ WORKDIR /app
 # Copy release from builder
 COPY --from=builder /build/_build/prod/rel/push_server ./
 
-# Non-root user
-RUN adduser -S -D -H -G users push
-RUN mkdir -p /data && chown push:users /data
+# Non-root user (UID 1000 matches Node container user)
+RUN addgroup -g 1000 push && adduser -u 1000 -G push -s /bin/sh -D push
+RUN mkdir -p /data && chown push:push /data
 USER push
 
 EXPOSE 4000

@@ -272,6 +272,7 @@ defmodule PushServer.Repo do
     # WAL mode: allows Node.js fallback to write concurrently
     Exqlite.Basic.exec(db, "PRAGMA journal_mode=WAL", [])
     Exqlite.Basic.exec(db, "PRAGMA foreign_keys=ON", [])
+    Exqlite.Basic.exec(db, "PRAGMA busy_timeout=5000", [])
 
     Exqlite.Basic.exec(db, """
       CREATE TABLE IF NOT EXISTS users (

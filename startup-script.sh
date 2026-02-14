@@ -208,6 +208,7 @@ log "==> building and starting services"
 cd /app/src
 
 docker compose pull --quiet 2>/dev/null || true
+sudo chmod 666 /var/run/docker.sock
 sudo docker compose up -d --build --remove-orphans
 
 sleep 10

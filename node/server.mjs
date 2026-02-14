@@ -28,47 +28,53 @@ const PORT    = parseInt(process.env.FALLBACK_PORT ?? '3000')
 
 // Open same SQLite file as Elixir
 // WAL mode was set by Elixir on first boot — reads/writes coexist safely
-const db = new Database(DB_PATH)
+// timeout: 5000ms helps avoid "database is locked" errors during contention
+const db = new Database(DB_PATH, { timeout: 5000 })
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
+db.pragma('busy_timeout = 5000')
 
 // Ensure schema exists — Node may start before Elixir on first boot
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    misskey_origin TEXT NOT NULL,
-    webhook_user_id TEXT NOT NULL,
-    webhook_secret TEXT NOT NULL,
-    push_subscription TEXT NOT NULL,
-    notification_preference TEXT NOT NULL DEFAULT 'quiet',
-    delay_minutes INTEGER NOT NULL DEFAULT 1,
-    supporter INTEGER NOT NULL DEFAULT 0,
-    last_webhook_at TEXT,
-    active INTEGER NOT NULL DEFAULT 1
-  )
-`)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS pending_notifications (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL,
-    payload TEXT NOT NULL,
-    deliver_at TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    retry_count INTEGER NOT NULL DEFAULT 0,
-    last_attempted_at TEXT,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  )
-`)
-db.exec(`
-  CREATE INDEX IF NOT EXISTS idx_pending_deliver_at
-  ON pending_notifications(deliver_at)
-`)
-db.exec(`
-  CREATE TABLE IF NOT EXISTS heartbeats (
-    name TEXT PRIMARY KEY,
-    last_at TEXT NOT NULL
-  )
-`)
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      misskey_origin TEXT NOT NULL,
+      webhook_user_id TEXT NOT NULL,
+      webhook_secret TEXT NOT NULL,
+      push_subscription TEXT NOT NULL,
+      notification_preference TEXT NOT NULL DEFAULT 'quiet',
+      delay_minutes INTEGER NOT NULL DEFAULT 1,
+      supporter INTEGER NOT NULL DEFAULT 0,
+      last_webhook_at TEXT,
+      active INTEGER NOT NULL DEFAULT 1
+    )
+  `)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pending_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      deliver_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      last_attempted_at TEXT,
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+  `)
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_pending_deliver_at
+    ON pending_notifications(deliver_at)
+  `)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS heartbeats (
+      name TEXT PRIMARY KEY,
+      last_at TEXT NOT NULL
+    )
+  `)
+} catch (err) {
+  console.error('[fallback] failed to initialize schema', err.message)
+}
 
 // VAPID — same keys as Elixir
 webpush.setVapidDetails(
@@ -85,7 +91,13 @@ app.post('/webhook/:user_id', async (req, reply) => {
   const userId = req.params.user_id
   const secret = req.headers['x-misskey-hook-secret']
 
-  const user = db.prepare('SELECT * FROM users WHERE id = ? AND active = 1').get(userId)
+  let user
+  try {
+    user = db.prepare('SELECT * FROM users WHERE id = ? AND active = 1').get(userId)
+  } catch (err) {
+    console.error('[fallback] sqlite error during user lookup', { userId, error: err.message })
+    return reply.code(200).send('ok')
+  }
 
   // Always return 200 — even on errors.
   // Misskey retrying will not fix most failure modes,

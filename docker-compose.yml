@@ -54,27 +54,6 @@ services:
     restart: unless-stopped
     depends_on:
       - prometheus
-      - loki
-
-  loki:
-    image: grafana/loki:latest
-    volumes:
-      - ./loki-config.yaml:/etc/loki/local-config.yaml:ro
-      - loki_data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-  alloy:
-    image: grafana/alloy:latest
-    volumes:
-      - ./config.alloy:/etc/alloy/config.alloy:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: run --host-pid-mode /etc/alloy/config.alloy
-    networks:
-      - monitoring
-    restart: unless-stopped
 
 networks:
   monitoring:
@@ -85,4 +64,3 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
-  loki_data:

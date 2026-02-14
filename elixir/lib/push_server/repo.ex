@@ -44,6 +44,7 @@ defmodule PushServer.Repo do
   @impl true
   def handle_call({:get_user, id}, _from, db) do
     case Exqlite.Basic.exec(db, "SELECT * FROM users WHERE id = ?", [id]) do
+      {:ok, _, %{rows: [row], columns: cols}, _} -> {:reply, {:ok, Enum.zip(cols, row) |> Map.new()}, db}
       {:ok, %{rows: [row], columns: cols}} -> {:reply, {:ok, Enum.zip(cols, row) |> Map.new()}, db}
       _ -> {:reply, {:ok, nil}, db}
     end
@@ -103,10 +104,15 @@ defmodule PushServer.Repo do
 
   def handle_call(:count_active_users, _from, db) do
     case Exqlite.Basic.exec(db, "SELECT COUNT(*) FROM users WHERE active = 1", []) do
+      {:ok, _, %{rows: [[n]]}, _} ->
+        count = if is_binary(n), do: String.to_integer(n), else: n
+        {:reply, count, db}
       {:ok, %{rows: [[n]]}} -> 
         count = if is_binary(n), do: String.to_integer(n), else: n
         {:reply, count, db}
-      _ -> {:reply, 0, db}
+      result ->
+        Logger.warning("Unexpected count result: #{inspect(result)}")
+        {:reply, 0, db}
     end
   end
 end

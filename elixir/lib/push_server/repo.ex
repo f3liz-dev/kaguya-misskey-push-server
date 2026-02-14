@@ -3,6 +3,7 @@ defmodule PushServer.Repo do
   Persistent storage for User registrations only.
   """
   use GenServer
+  require Logger
 
   @db_path System.get_env("DB_PATH", "/data/push_server.db")
 
@@ -20,6 +21,7 @@ defmodule PushServer.Repo do
   def init(_) do
     db_path = @db_path
     File.mkdir_p!(Path.dirname(db_path))
+    Logger.info("Repo: Opening database at #{db_path}")
     {:ok, db} = Exqlite.Basic.open(db_path)
     
     Exqlite.Basic.exec(db, """
@@ -48,7 +50,8 @@ defmodule PushServer.Repo do
   end
 
   def handle_call({:insert_user, user}, _from, db) do
-    Exqlite.Basic.exec(db, """
+    Logger.info("Repo: Attempting to insert/update user #{user.id}")
+    res = Exqlite.Basic.exec(db, """
       INSERT INTO users (id, misskey_origin, webhook_user_id, webhook_secret, push_subscription, notification_preference, delay_minutes, active)
       VALUES (?, ?, ?, ?, ?, ?, ?, 1)
       ON CONFLICT(id) DO UPDATE SET
@@ -58,6 +61,12 @@ defmodule PushServer.Repo do
         delay_minutes = excluded.delay_minutes,
         active = 1
     """, [user.id, user.misskey_origin, user.webhook_user_id, user.webhook_secret, Jason.encode!(user.push_subscription), user.notification_preference, user.delay_minutes])
+    
+    case res do
+      {:ok, _} -> Logger.info("Repo: Successfully saved user #{user.id}")
+      err -> Logger.error("Repo: Failed to save user #{user.id}: #{inspect(err)}")
+    end
+    
     {:reply, :ok, db}
   end
 
@@ -83,7 +92,9 @@ defmodule PushServer.Repo do
 
   def handle_call(:count_active_users, _from, db) do
     case Exqlite.Basic.exec(db, "SELECT COUNT(*) FROM users WHERE active = 1", []) do
-      {:ok, %{rows: [[n]]}} -> {:reply, n, db}
+      {:ok, %{rows: [[n]]}} -> 
+        count = if is_binary(n), do: String.to_integer(n), else: n
+        {:reply, count, db}
       _ -> {:reply, 0, db}
     end
   end

@@ -11,7 +11,8 @@ defmodule PushServer.Web.Router do
     conn
     |> put_resp_header("access-control-allow-origin", "*")
     |> put_resp_header("access-control-allow-methods", "POST, GET, PATCH, DELETE, OPTIONS")
-    |> put_resp_header("access-control-allow-headers", "content-type, x-misskey-hook-secret")
+    |> put_resp_header("access-control-allow-headers", "Authorization, Content-Type, X-Misskey-Hook-Secret")
+    |> put_resp_header("access-control-max-age", "86400")
     |> handle_options()
   end
 

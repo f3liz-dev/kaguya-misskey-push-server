@@ -32,6 +32,44 @@ const db = new Database(DB_PATH)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
+// Ensure schema exists — Node may start before Elixir on first boot
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    misskey_origin TEXT NOT NULL,
+    webhook_user_id TEXT NOT NULL,
+    webhook_secret TEXT NOT NULL,
+    push_subscription TEXT NOT NULL,
+    notification_preference TEXT NOT NULL DEFAULT 'quiet',
+    delay_minutes INTEGER NOT NULL DEFAULT 1,
+    supporter INTEGER NOT NULL DEFAULT 0,
+    last_webhook_at TEXT,
+    active INTEGER NOT NULL DEFAULT 1
+  )
+`)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS pending_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    deliver_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    last_attempted_at TEXT,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  )
+`)
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_pending_deliver_at
+  ON pending_notifications(deliver_at)
+`)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS heartbeats (
+    name TEXT PRIMARY KEY,
+    last_at TEXT NOT NULL
+  )
+`)
+
 // VAPID — same keys as Elixir
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT,

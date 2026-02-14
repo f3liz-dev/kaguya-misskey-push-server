@@ -83,8 +83,22 @@ if [ -f /etc/debian_version ]; then
   apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 elif [ -f /etc/fedora-release ]; then
-  # Fedora Cloud path — moby-engine is real Docker, not podman-docker
-  dnf install -y moby-engine docker-compose-plugin sqlite git
+ dnf remove -y docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-selinux \
+                  docker-engine-selinux \
+                  docker-engine \
+                  docker-cli \
+                  docker-compose-plugin \
+                  moby-engine
+  dnf config-manager addrepo --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo --overwrite
+  dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  dnf install -y sqlite git
 fi
 
 systemctl enable --now docker

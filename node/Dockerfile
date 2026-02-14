@@ -8,7 +8,7 @@ RUN npm install --production
 # --- Runtime stage ---
 FROM node:20-alpine AS runtime
 
-RUN apk add --no-cache tini
+RUN apk add --no-cache tini curl
 
 WORKDIR /app
 

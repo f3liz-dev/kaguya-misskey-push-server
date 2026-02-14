@@ -41,7 +41,7 @@ log() { echo "[startup $(date -u +%H:%M:%S)] $*"; }
 if [ -f /app/.setup-done ]; then
   log "already set up — starting services"
   cd /app/src
-  docker compose up -d
+  sudo docker compose up -d
   exit 0
 fi
 
@@ -83,8 +83,8 @@ if [ -f /etc/debian_version ]; then
   apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 elif [ -f /etc/fedora-release ]; then
-  # Fedora Cloud path
-  dnf install -y docker docker-compose sqlite git
+  # Fedora Cloud path — moby-engine is real Docker, not podman-docker
+  dnf install -y moby-engine docker-compose-plugin sqlite git
 fi
 
 systemctl enable --now docker
@@ -123,7 +123,7 @@ print(base64.b64decode(d['payload']['data']).decode())
   exit 1
 fi
 
-chmod 600 /app/.env
+chmod 644 /app/.env
 
 if [ ! -s /app/.env ]; then
   log "ERROR: .env is empty"
@@ -193,77 +193,8 @@ log "    firewall configured"
 log "==> building and starting services"
 cd /app/src
 
-# overwrite docker-compose.yml in repo with clean version (no otel-collector)
-# otel adds 128MB RAM — too expensive for e2-micro free tier
-cat > /app/src/docker-compose.yml << 'COMPOSEOF'
-services:
-  elixir:
-    build:
-      context: ./elixir
-      dockerfile: Dockerfile
-    environment:
-      - DB_PATH=/data/push_server.db
-      - PORT=4000
-    networks:
-      - internal
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 128M
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:4000/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-
-  node:
-    build:
-      context: ./node
-      dockerfile: Dockerfile
-    environment:
-      - DB_PATH=/data/push_server.db
-      - FALLBACK_PORT=3000
-    networks:
-      - internal
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-        reservations:
-          memory: 64M
-    healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:3000/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-
-  nginx:
-    image: nginx:1.27-alpine
-    volumes:
-      - ./nginx/push-server.conf:/etc/nginx/conf.d/default.conf:ro
-    networks:
-      - internal
-    deploy:
-      resources:
-        limits:
-          memory: 32M
-    depends_on:
-      node:
-        condition: service_healthy
-      elixir:
-        condition: service_started
-
-networks:
-  internal:
-    driver: bridge
-COMPOSEOF
-
 docker compose pull --quiet 2>/dev/null || true
-docker compose up -d --build --remove-orphans
+sudo docker compose up -d --build --remove-orphans
 
 sleep 10
 
@@ -286,7 +217,7 @@ log "pulling latest code"
 cd /app/src && git pull
 
 log "rebuilding containers"
-docker compose up -d --build
+sudo docker compose up -d --build
 
 sleep 5
 log "health check"
@@ -328,7 +259,7 @@ echo "==> pending rows: $PENDING"
 
 read -rp "==> stop services? [y/N] " confirm
 if [[ "$confirm" == "y" ]]; then
-  cd /app/src && docker compose down
+  cd /app/src && sudo docker compose down
   echo "    stopped — safe to delete instance"
 fi
 MIGRATE

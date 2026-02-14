@@ -122,7 +122,7 @@ app.get('/health', async (_req, reply) => {
 
 // --- Start ---
 
-app.listen({ port: PORT, host: '127.0.0.1' }, (err) => {
+app.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
   if (err) { console.error(err); process.exit(1) }
   console.log(`[fallback] listening on ${PORT}`)
 })

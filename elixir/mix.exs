@@ -35,13 +35,6 @@ defmodule PushServer.MixProject do
 
       # HTTP client (for web push dispatch)
       {:req, "~> 0.5"},
-
-      # OpenTelemetry
-      {:opentelemetry, "~> 1.4"},
-      {:opentelemetry_api, "~> 1.3"},
-      {:opentelemetry_exporter, "~> 1.7"},
-      {:opentelemetry_cowboy, "~> 0.3"},
-      {:opentelemetry_req, "~> 0.2"},
     ]
   end
 end

@@ -29,7 +29,7 @@ This server
 1. Generate VAPID keys: `npx web-push generate-vapid-keys`
 2. Create `.env` from `.env.example` and fill in VAPID keys
 3. Store in GCP Secret Manager: `gcloud secrets create push-server-env --data-file=.env`
-4. Create instance with `cloud-init.yml` (see comments in file for full command)
+4. Create instance with `startup-script.sh` (see comments in file for full command)
 
 ### Docker Compose (dev/alternative)
 
@@ -38,10 +38,6 @@ cp .env.example .env
 # Fill in VAPID keys
 docker compose up -d
 ```
-
-### Manual
-
-See `cloud-init.yml` for the full setup sequence — it's a readable script.
 
 ## Endpoints
 
@@ -57,8 +53,7 @@ See `cloud-init.yml` for the full setup sequence — it's a readable script.
 
 ```bash
 # Logs
-journalctl -u push-server-elixir -f
-journalctl -u push-server-node -f
+cd /app/src && docker compose logs -f
 
 # Deploy update
 /app/deploy.sh

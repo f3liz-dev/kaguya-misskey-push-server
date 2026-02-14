@@ -13,10 +13,6 @@ defmodule PushServer.Application do
 
   @impl true
   def start(_type, _args) do
-    # Set up OpenTelemetry instrumentation for Cowboy and Req
-    OpentelemetryCowboy.setup()
-    OpentelemetryReq.setup()
-
     children = [
       PushServer.Repo,
       PushServer.Worker.DeliveryWorker,

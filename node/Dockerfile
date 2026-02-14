@@ -13,7 +13,7 @@ RUN apk add --no-cache tini
 WORKDIR /app
 
 COPY --from=build /app/node_modules ./node_modules
-COPY package.json server.mjs tracing.cjs ./
+COPY package.json server.mjs ./
 
 # Data volume for SQLite (shared with Elixir)
 RUN mkdir -p /data
@@ -31,4 +31,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s \
   CMD node -e "require('http').get('http://localhost:3000/health',r=>{r.statusCode===200?process.exit(0):process.exit(1)}).on('error',()=>process.exit(1))"
 
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "--require", "./tracing.cjs", "--max-old-space-size=128", "server.mjs"]
+CMD ["node", "--max-old-space-size=128", "server.mjs"]

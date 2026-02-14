@@ -4,9 +4,9 @@ defmodule PushServer.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      PushServer.Telemetry,
       PushServer.Repo,
       PushServer.Buffer,
+      PushServer.Telemetry,
       PushServer.Worker.DeliveryWorker,
       PushServer.Web.Endpoint,
     ]

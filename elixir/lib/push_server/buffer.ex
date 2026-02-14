@@ -10,22 +10,46 @@ defmodule PushServer.Buffer do
   def start_link(_), do: GenServer.start_link(__MODULE__, [], name: __MODULE__)
 
   def insert(user_id, payload, deliver_at) do
-    # ID is a simple ref for in-memory uniqueness
-    id = make_ref()
-    :ets.insert(@table, {id, user_id, payload, deliver_at, DateTime.utc_now()})
-    :ok
+    case :ets.info(@table, :name) do
+      :undefined ->
+        :ok
+
+      _ ->
+        # ID is a simple ref for in-memory uniqueness
+        id = make_ref()
+        :ets.insert(@table, {id, user_id, payload, deliver_at, DateTime.utc_now()})
+        :ok
+    end
   end
 
   def get_due() do
     now = DateTime.utc_now()
-    # Match all, filter in memory (it's a small toy project)
-    :ets.tab2list(@table)
-    |> Enum.filter(fn {_, _, _, deliver_at, _} -> DateTime.compare(deliver_at, now) != :gt end)
+
+    case :ets.info(@table, :name) do
+      :undefined ->
+        []
+
+      _ ->
+        # Match all, filter in memory (it's a small toy project)
+        :ets.tab2list(@table)
+        |> Enum.filter(fn {_, _, _, deliver_at, _} -> DateTime.compare(deliver_at, now) != :gt end)
+    end
   end
 
   def delete(ids) do
-    Enum.each(ids, &:ets.delete(@table, &1))
+    case :ets.info(@table, :name) do
+      :undefined -> :ok
+      _ -> Enum.each(ids, &:ets.delete(@table, &1))
+    end
+
     :ok
+  end
+
+  def buffer_size() do
+    case :ets.info(@table, :size) do
+      :undefined -> 0
+      size -> size
+    end
   end
 
   @impl true

@@ -50,7 +50,9 @@ defmodule PushServer.Telemetry do
   end
 
   def measure_business_metrics do
-    :telemetry.execute([:push_server, :buffer, :size], %{count: length(PushServer.Buffer.get_due())})
-    :telemetry.execute([:push_server, :repo, :active_users], %{count: PushServer.Repo.count_active_users()})
+    :telemetry.execute([:push_server, :buffer, :size], %{count: PushServer.Buffer.buffer_size()})
+
+    repo_count = if Process.whereis(PushServer.Repo), do: PushServer.Repo.count_active_users(), else: 0
+    :telemetry.execute([:push_server, :repo, :active_users], %{count: repo_count})
   end
 end

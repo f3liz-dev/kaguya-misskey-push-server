@@ -1,11 +1,11 @@
 # Multi-stage build — builder is large, final image is small
 # Stage 1: build the release
-FROM hexpm/elixir:1.16.3-erlang-26.2.5-debian-bookworm-20240612 AS builder
+FROM elixir:1.19.5-alpine AS builder
 
 WORKDIR /build
 
 # Install build deps
-RUN apt-get update -q && apt-get install -y -q git
+RUN apk add --no-cache git build-base
 
 # Copy mix files first — layer cache: deps only reinstall if mix.exs changes
 COPY mix.exs mix.lock ./
@@ -19,12 +19,9 @@ COPY config ./config
 RUN MIX_ENV=prod mix release
 
 # Stage 2: minimal runtime image
-FROM debian:bookworm-slim AS runtime
+FROM alpine:3.23.3 AS runtime
 
-RUN apt-get update -q && \
-    apt-get install -y -q --no-install-recommends \
-      libssl3 libncurses6 libstdc++6 curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache openssl ncurses-libs libstdc++ curl libgcc
 
 WORKDIR /app
 
@@ -32,7 +29,7 @@ WORKDIR /app
 COPY --from=builder /build/_build/prod/rel/push_server ./
 
 # Non-root user
-RUN useradd --system --no-create-home push
+RUN adduser -S -D -H push
 RUN mkdir -p /data && chown push:push /data
 USER push
 

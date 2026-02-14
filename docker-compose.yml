@@ -11,6 +11,11 @@ services:
     networks:
       - monitoring
       - public
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
 
   elixir:
     image: ghcr.io/f3liz-dev/kaguya-misskey-push-server-elixir:latest
@@ -29,7 +34,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          cpus: '0.4'
+          memory: 384M
 
   prometheus:
     image: prom/prometheus:latest
@@ -42,6 +48,11 @@ services:
     networks:
       - monitoring
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
 
   grafana:
     image: grafana/grafana:latest
@@ -54,6 +65,11 @@ services:
     restart: unless-stopped
     depends_on:
       - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
 
 networks:
   monitoring:

@@ -132,8 +132,22 @@ jobs:
             -e FALLBACK_PORT=3000 \
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-node:${{ github.ref_name }}
           
-          # Wait for healthcheck to pass
-          timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" test-node | grep -q healthy; do sleep 2; done'
+          # Wait for container to start and be healthy
+          sleep 10
+          
+          # Check if container is still running
+          if ! docker ps | grep -q test-node; then
+            echo "Container failed to start. Logs:"
+            docker logs test-node
+            exit 1
+          fi
+          
+          # Wait for healthcheck to pass (with timeout)
+          timeout 60 sh -c 'until docker inspect --format="{{.State.Health.Status}}" test-node 2>/dev/null | grep -q healthy; do sleep 2; done' || {
+            echo "Health check failed. Container logs:"
+            docker logs test-node
+            exit 1
+          }
           
           # Test health endpoint
           docker exec test-node curl -f http://localhost:3000/health

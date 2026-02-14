@@ -50,7 +50,11 @@ defmodule PushServer.WebPush do
       end
     rescue
       e -> 
-        Logger.error("encryption or dispatch failed", error: inspect(e))
+        Logger.error("encryption or dispatch failed", 
+          error: Exception.message(e),
+          stacktrace: Exception.format_stacktrace(__STACKTRACE__),
+          endpoint: endpoint
+        )
         {:error, :encryption_failed}
     end
   end

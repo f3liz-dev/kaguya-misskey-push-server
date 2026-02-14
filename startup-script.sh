@@ -12,15 +12,7 @@ set -euo pipefail
 
 log() { echo "[startup $(date -u +%H:%M:%S)] $*"; }
 
-# --- idempotent guard ---
-if [ -f /app/.setup-done ]; then
-  log "already set up — starting services"
-  cd /app/src
-  sudo nerdctl compose up -d
-  exit 0
-fi
-
-log "==> starting first-boot setup"
+log "==> starting setup and service synchronization"
 
 # --- swap: 512MB ---
 log "==> creating 512MB swap"
@@ -47,15 +39,21 @@ if [ -f /etc/debian_version ]; then
   apt-get install -y -q containerd.io
 elif [ -f /etc/fedora-release ]; then
   dnf install -y containerd sqlite git procps-ng curl file
-  dnf groupinstall -y "Development Tools"
+  dnf group install -y development-tools
 fi
 
 # --- install Homebrew ---
 log "==> installing Homebrew"
-if [ ! -d /home/linuxbrew/.linuxbrew ]; then
+if ! id -u linuxbrew >/dev/null 2>&1; then
   useradd -m -s /bin/bash linuxbrew || true
+fi
+
+if ! grep -q "^linuxbrew" /etc/sudoers; then
   echo "linuxbrew ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-  sudo -u linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+if [ ! -d /home/linuxbrew/.linuxbrew ]; then
+  (cd /home/linuxbrew && sudo -u linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)")
 fi
 
 # Set up brew environment for the rest of this script
@@ -64,7 +62,7 @@ echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' > /etc/profile.d/h
 
 # --- install nerdctl + buildkit via brew ---
 log "==> installing nerdctl + buildkit + jq via brew"
-sudo -u linuxbrew -H /home/linuxbrew/.linuxbrew/bin/brew install nerdctl buildkit cni-plugins jq
+(cd /home/linuxbrew && sudo -u linuxbrew -H /home/linuxbrew/.linuxbrew/bin/brew install nerdctl buildkit cni-plugins jq)
 
 # Symlink for sudo and systemd
 ln -sf /home/linuxbrew/.linuxbrew/bin/nerdctl /usr/local/bin/nerdctl
@@ -104,7 +102,7 @@ log "    nerdctl $(nerdctl --version)"
 # --- fetch .env from Secret Manager ---
 log "==> fetching .env from Secret Manager"
 mkdir -p /app /data
-chown 1000:1000 /data
+chown -R 1000:1000 /data
 
 ACCESS_TOKEN=$(curl -sf -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" | jq -r .access_token)
 PROJECT_ID=$(curl -sf -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/project/project-id")
@@ -174,5 +172,4 @@ cd /app/src && sudo nerdctl compose down
 MIGRATE
 chmod +x /app/migrate.sh
 
-touch /app/.setup-done
-log "==> SETUP COMPLETE"
+log "==> SETUP/STARTUP COMPLETE"

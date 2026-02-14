@@ -35,6 +35,11 @@ defmodule PushServer.MixProject do
 
       # HTTP client (for web push dispatch)
       {:req, "~> 0.5"},
+
+      # Monitoring
+      {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_poller, "~> 1.0"},
+      {:telemetry_metrics_prometheus, "~> 1.1"}
     ]
   end
 end

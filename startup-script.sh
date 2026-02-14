@@ -173,16 +173,6 @@ services:
     restart: unless-stopped
     volumes:
       - /data:/data
-
-  node:
-    restart: unless-stopped
-    volumes:
-      - /data:/data
-
-  nginx:
-    restart: unless-stopped
-    ports:
-      - "80:80"
 EOF
 
 log "    compose override written"
@@ -193,13 +183,9 @@ if command -v ufw &>/dev/null; then
   ufw default deny incoming
   ufw default allow outgoing
   ufw allow ssh
-  ufw allow 80/tcp
-  ufw allow 443/tcp
   ufw --force enable
 elif command -v firewall-cmd &>/dev/null; then
   firewall-cmd --permanent --add-service=ssh
-  firewall-cmd --permanent --add-service=http
-  firewall-cmd --permanent --add-service=https
   firewall-cmd --reload
 fi
 log "    firewall configured"
@@ -216,7 +202,7 @@ sleep 10
 
 # --- health check ---
 log "==> health check"
-if curl -sf http://localhost/health | python3 -m json.tool; then
+if curl -sf http://localhost:4000/health | python3 -m json.tool; then
   log "    health check passed"
 else
   log "    WARN: health check failed"

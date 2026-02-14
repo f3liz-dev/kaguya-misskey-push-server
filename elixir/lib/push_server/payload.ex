@@ -28,12 +28,13 @@ defmodule PushServer.Payload do
         payload = %{
           title: title(type, body),
           body: body_text(type, body),
-          tag: tag(type, body),
+          tag: body["id"] || tag(type, body),
           silent: silent?(type, preference),
           renotify: false,
-          data: %{type: type}
-          # notification content not included in data —
-          # title/body is enough, full content stays on Misskey
+          data: %{
+            type: type,
+            id: body["id"]
+          }
         }
         {:ok, payload}
 

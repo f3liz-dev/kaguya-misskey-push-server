@@ -33,11 +33,11 @@ if [ ! -f /swapfile ]; then
 fi
 log "    swap ready"
 
-# --- install containerd and nerdctl (Debian/Ubuntu) ---
-log "==> installing containerd + nerdctl"
+# --- install containerd and system dependencies ---
+log "==> installing system dependencies"
 if [ -f /etc/debian_version ]; then
   apt-get update -q
-  apt-get install -y -q ca-certificates curl gnupg sqlite3 git
+  apt-get install -y -q ca-certificates curl gnupg sqlite3 git build-essential procps file
 
   # Install containerd from official Docker repo (best source for up-to-date containerd)
   install -m 0755 -d /etc/apt/keyrings
@@ -45,21 +45,59 @@ if [ -f /etc/debian_version ]; then
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
   apt-get update -q
   apt-get install -y -q containerd.io
-
-  # Install nerdctl (Full bundle includes buildkit, CNI, etc.)
-  # We'll use the latest release from GitHub
-  NERDCTL_VERSION=$(curl -s https://api.github.com/repos/containerd/nerdctl/releases/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'][1:])")
-  curl -L -o nerdctl.tar.gz "https://github.com/containerd/nerdctl/releases/download/v${NERDCTL_VERSION}/nerdctl-full-${NERDCTL_VERSION}-linux-$(dpkg --print-architecture).tar.gz"
-  tar Cxzf /usr/local nerdctl.tar.gz
-  rm nerdctl.tar.gz
-
-  systemctl enable --now containerd
-  systemctl enable --now buildkit
 elif [ -f /etc/fedora-release ]; then
-  dnf install -y containerd nerdctl buildkit sqlite git
-  systemctl enable --now containerd
-  systemctl enable --now buildkit
+  dnf install -y containerd sqlite git procps-ng curl file
+  dnf groupinstall -y "Development Tools"
 fi
+
+# --- install Homebrew ---
+log "==> installing Homebrew"
+if [ ! -d /home/linuxbrew/.linuxbrew ]; then
+  useradd -m -s /bin/bash linuxbrew || true
+  echo "linuxbrew ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+  sudo -u linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+# Set up brew environment for the rest of this script
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' > /etc/profile.d/homebrew.sh
+
+# --- install nerdctl + buildkit via brew ---
+log "==> installing nerdctl + buildkit + jq via brew"
+sudo -u linuxbrew -H /home/linuxbrew/.linuxbrew/bin/brew install nerdctl buildkit cni-plugins jq
+
+# Symlink for sudo and systemd
+ln -sf /home/linuxbrew/.linuxbrew/bin/nerdctl /usr/local/bin/nerdctl
+ln -sf /home/linuxbrew/.linuxbrew/bin/buildkitd /usr/local/bin/buildkitd
+ln -sf /home/linuxbrew/.linuxbrew/bin/buildctl /usr/local/bin/buildctl
+ln -sf /home/linuxbrew/.linuxbrew/bin/jq /usr/local/bin/jq
+mkdir -p /opt/cni/bin
+ln -sf /home/linuxbrew/.linuxbrew/opt/cni-plugins/bin/* /opt/cni/bin/
+
+# Create buildkit systemd service
+cat > /etc/systemd/system/buildkit.service << 'EOF'
+[Unit]
+Description=BuildKit
+Documentation=https://github.com/moby/buildkit
+After=network.target containerd.service
+Requires=containerd.service
+
+[Service]
+ExecStart=/usr/local/bin/buildkitd --containerd-worker=true --containerd-worker-gc=true
+KillMode=process
+Delegate=yes
+LimitNOFILE=1048576
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now containerd
+systemctl enable --now buildkit
 
 log "    nerdctl $(nerdctl --version)"
 
@@ -68,10 +106,10 @@ log "==> fetching .env from Secret Manager"
 mkdir -p /app /data
 chown 1000:1000 /data
 
-ACCESS_TOKEN=$(curl -sf -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])")
+ACCESS_TOKEN=$(curl -sf -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" | jq -r .access_token)
 PROJECT_ID=$(curl -sf -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/project/project-id")
 
-if ! curl -sf -H "Authorization: Bearer $ACCESS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/$PROJECT_ID/secrets/push-server-env/versions/latest:access" | python3 -c "import json, sys, base64; d = json.load(sys.stdin); print(base64.b64decode(d['payload']['data']).decode())" > /app/.env 2>/tmp/secret-err; then
+if ! curl -sf -H "Authorization: Bearer $ACCESS_TOKEN" "https://secretmanager.googleapis.com/v1/projects/$PROJECT_ID/secrets/push-server-env/versions/latest:access" | jq -r .payload.data | base64 -d > /app/.env 2>/tmp/secret-err; then
   log "ERROR: failed to fetch secret"
   exit 1
 fi
@@ -108,7 +146,7 @@ sleep 10
 
 # --- health check ---
 log "==> health check"
-if curl -sf http://localhost:4000/health | python3 -m json.tool; then
+if curl -sf http://localhost:4000/health | jq .; then
   log "    health check passed"
 else
   log "    WARN: health check failed"

@@ -46,7 +46,12 @@ defmodule PushServer.Worker.DeliveryWorker do
             cleanup(rows)
           {:error, reason} ->
             :telemetry.execute([:push_server, :delivery, :failure], %{count: 1}, %{reason: inspect(reason)})
-            Logger.warning("delivery failed", user_id: user_id, reason: inspect(reason))
+            Logger.warning("delivery failed", 
+              user_id: user_id, 
+              reason: inspect(reason),
+              endpoint: subscription["endpoint"],
+              has_keys: Map.has_key?(subscription, "keys")
+            )
             # In a toy project, we'll just let them stay in buffer or drop if too old
         end
 

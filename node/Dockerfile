@@ -16,7 +16,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY package.json server.mjs ./
 
 # Data volume for SQLite (shared with Elixir)
-RUN mkdir -p /data
+RUN mkdir -p /data && chown node:node /data
 VOLUME /data
 
 ENV DB_PATH=/data/push_server.db

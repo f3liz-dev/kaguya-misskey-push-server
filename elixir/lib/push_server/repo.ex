@@ -63,14 +63,20 @@ defmodule PushServer.Repo do
     """, [user.id, user.misskey_origin, user.webhook_user_id, user.webhook_secret, Jason.encode!(user.push_subscription), user.notification_preference, user.delay_minutes])
     
     case res do
-      {:ok, _, _} -> 
+      {:ok, _, _, _} -> 
+        Logger.info("Repo: Successfully saved user #{user.id}")
+        {:reply, :ok, db}
+      {:ok, _, _} ->
         Logger.info("Repo: Successfully saved user #{user.id}")
         {:reply, :ok, db}
       {:ok, _} ->
         Logger.info("Repo: Successfully saved user #{user.id}")
         {:reply, :ok, db}
+      {:error, reason} -> 
+        Logger.error("Repo: Failed to save user #{user.id}: #{inspect(reason)}")
+        {:reply, {:error, :db_error}, db}
       err -> 
-        Logger.error("Repo: Failed to save user #{user.id}: #{inspect(err)}")
+        Logger.error("Repo: Failed to save user #{user.id} (unexpected): #{inspect(err)}")
         {:reply, {:error, :db_error}, db}
     end
   end

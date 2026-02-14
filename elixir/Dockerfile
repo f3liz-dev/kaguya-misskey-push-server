@@ -13,10 +13,14 @@ RUN mix local.hex --force --quiet && \
     mix local.rebar --force --quiet && \
     MIX_ENV=prod mix deps.get --only prod
 
+# Compile dependencies separately for better caching
+RUN MIX_ENV=prod mix deps.compile
+
 # Copy source and build release
 COPY lib ./lib
 COPY config ./config
-RUN MIX_ENV=prod mix release
+RUN MIX_ENV=prod mix compile --warnings-as-errors && \
+    MIX_ENV=prod mix release
 
 # Stage 2: minimal runtime image
 FROM alpine:3.23.3 AS runtime

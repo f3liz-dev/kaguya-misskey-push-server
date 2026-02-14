@@ -144,9 +144,16 @@ services:
 EOF
 
 # --- start services ---
-log "==> starting services with nerdctl"
+log "==> pulling latest images and restarting services"
 cd /app/src
+
+# Pull latest images
 sudo nerdctl compose pull
+
+# Stop and remove containers to ensure updates are applied
+sudo nerdctl compose down
+
+# Start with fresh containers
 sudo nerdctl compose up -d --remove-orphans
 
 sleep 10
@@ -164,8 +171,29 @@ cat > /app/deploy.sh << 'DEPLOY'
 #!/bin/bash
 set -euo pipefail
 log() { echo "[deploy] $*"; }
+
+log "Pulling latest code..."
 cd /app/src && git pull
-sudo nerdctl compose up -d --build
+
+log "Pulling latest images..."
+sudo nerdctl compose pull
+
+log "Stopping old containers..."
+sudo nerdctl compose down
+
+log "Starting updated containers..."
+sudo nerdctl compose up -d --remove-orphans
+
+log "Waiting for services to start..."
+sleep 10
+
+log "Health check..."
+if curl -sf http://localhost:4000/health | jq .; then
+  log "✅ Deployment successful!"
+else
+  log "❌ Health check failed!"
+  exit 1
+fi
 DEPLOY
 chmod +x /app/deploy.sh
 

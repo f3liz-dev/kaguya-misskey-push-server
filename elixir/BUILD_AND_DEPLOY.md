@@ -10,15 +10,31 @@ The `PushServer.Repo.insert_user/1` function was always returning `:ok` even whe
 
 ## Build new Docker image
 
+### Standard Build
 ```bash
 cd kaguya-misskey-push-server/elixir
-
-# Build the image
 docker build -t ghcr.io/f3liz-dev/kaguya-misskey-push-server-elixir:latest .
-
-# Or if you use nerdctl
-nerdctl build -t ghcr.io/f3liz-dev/kaguya-misskey-push-server-elixir:latest .
 ```
+
+### Optimized Build (recommended - 50-70% faster)
+```bash
+cd kaguya-misskey-push-server/elixir
+export DOCKER_BUILDKIT=1
+docker build -f Dockerfile.buildkit \
+  -t ghcr.io/f3liz-dev/kaguya-misskey-push-server-elixir:latest .
+```
+
+### For nerdctl
+```bash
+cd kaguya-misskey-push-server/elixir
+# Standard
+nerdctl build -t ghcr.io/f3liz-dev/kaguya-misskey-push-server-elixir:latest .
+# Or optimized (faster)
+nerdctl build -f Dockerfile.buildkit \
+  -t ghcr.io/f3liz-dev/kaguya-misskey-push-server-elixir:latest .
+```
+
+See [BUILD_OPTIMIZATION.md](./BUILD_OPTIMIZATION.md) for detailed performance info.
 
 ## Push to GitHub Container Registry
 

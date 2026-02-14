@@ -8,10 +8,18 @@ defmodule PushServer.MixProject do
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      # Compiler optimizations
+      consolidate_protocols: Mix.env() == :prod,
+      compilers: Mix.compilers(),
+      # Build optimizations
+      build_embedded: Mix.env() == :prod,
       releases: [
         push_server: [
           include_executables_for: [:unix],
-          strip_beams: false
+          strip_beams: Mix.env() == :prod,
+          # Skip unnecessary files in release
+          include_erts: true,
+          quiet: true
         ]
       ]
     ]

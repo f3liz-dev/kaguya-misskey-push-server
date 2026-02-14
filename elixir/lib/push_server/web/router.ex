@@ -42,11 +42,21 @@ defmodule PushServer.Web.Router do
   end
 
   post "/register" do
+    Logger.info("Register request received: #{inspect(conn.body_params)}")
     with {:ok, body} <- validate_register(conn.body_params),
          :ok <- PushServer.Repo.insert_user(body) do
+      Logger.info("Registration successful for user: #{body.id}")
       send_json(conn, 200, %{ok: true})
     else
-      _ -> send_json(conn, 400, %{error: "invalid request"})
+      {:error, :invalid} -> 
+        Logger.warning("Registration failed: invalid request body")
+        send_json(conn, 400, %{error: "invalid request"})
+      {:error, :db_error} -> 
+        Logger.error("Registration failed: database error")
+        send_json(conn, 500, %{error: "database error"})
+      _ -> 
+        Logger.error("Registration failed: unknown error")
+        send_json(conn, 400, %{error: "invalid request"})
     end
   end
 
@@ -82,7 +92,9 @@ defmodule PushServer.Web.Router do
 
   defp validate_register(p) do
     required = ["id", "misskey_origin", "webhook_user_id", "webhook_secret", "push_subscription"]
-    if Enum.all?(required, &Map.has_key?(p, &1)) do
+    missing = Enum.filter(required, fn key -> !Map.has_key?(p, key) end)
+    
+    if Enum.empty?(missing) do
       {:ok, %{
         id: p["id"],
         misskey_origin: p["misskey_origin"],
@@ -93,6 +105,7 @@ defmodule PushServer.Web.Router do
         delay_minutes: p["delay_minutes"] || 1
       }}
     else
+      Logger.warning("Missing required fields: #{inspect(missing)}")
       {:error, :invalid}
     end
   end

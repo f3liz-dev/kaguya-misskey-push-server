@@ -107,6 +107,7 @@ log "    Docker $(docker --version)"
 # --- fetch .env from Secret Manager ---
 log "==> fetching .env from Secret Manager"
 mkdir -p /app /data
+chown 1000:1000 /data
 
 # Use Secret Manager REST API directly
 # gcloud is not reliably in PATH during startup-script execution

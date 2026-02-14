@@ -22,9 +22,17 @@
 import Fastify from 'fastify'
 import Database from 'better-sqlite3'
 import webpush from 'web-push'
+import fs from 'fs'
+import path from 'path'
 
 const DB_PATH = process.env.DB_PATH ?? '/data/push_server.db'
 const PORT    = parseInt(process.env.FALLBACK_PORT ?? '3000')
+
+// Ensure directory exists
+const dbDir = path.dirname(DB_PATH)
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true })
+}
 
 // Open same SQLite file as Elixir
 // WAL mode was set by Elixir on first boot — reads/writes coexist safely

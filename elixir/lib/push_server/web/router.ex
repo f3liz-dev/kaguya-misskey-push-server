@@ -3,8 +3,22 @@ defmodule PushServer.Web.Router do
   require Logger
 
   plug Plug.Parsers, parsers: [:json], json_decoder: Jason
+  plug :cors
   plug :match
   plug :dispatch
+
+  defp cors(conn, _opts) do
+    conn
+    |> put_resp_header("access-control-allow-origin", "*")
+    |> put_resp_header("access-control-allow-methods", "POST, GET, PATCH, DELETE, OPTIONS")
+    |> put_resp_header("access-control-allow-headers", "content-type, x-misskey-hook-secret")
+    |> handle_options()
+  end
+
+  defp handle_options(%{method: "OPTIONS"} = conn) do
+    conn |> send_resp(204, "") |> halt()
+  end
+  defp handle_options(conn), do: conn
 
   post "/webhook/:user_id" do
     user_id = conn.params["user_id"]

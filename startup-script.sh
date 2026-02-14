@@ -29,7 +29,7 @@ log "    swap ready"
 log "==> installing system dependencies"
 if [ -f /etc/debian_version ]; then
   apt-get update -q
-  apt-get install -y -q ca-certificates curl gnupg sqlite3 git build-essential procps file
+  apt-get install -y -q ca-certificates curl gnupg sqlite3 git build-essential procps file jq
 
   # Install containerd from official Docker repo (best source for up-to-date containerd)
   install -m 0755 -d /etc/apt/keyrings
@@ -38,7 +38,7 @@ if [ -f /etc/debian_version ]; then
   apt-get update -q
   apt-get install -y -q containerd.io
 elif [ -f /etc/fedora-release ]; then
-  dnf install -y containerd sqlite git procps-ng curl file
+  dnf install -y containerd sqlite git procps-ng curl file jq
   dnf group install -y development-tools
 fi
 
@@ -52,8 +52,12 @@ if ! grep -q "^linuxbrew" /etc/sudoers; then
   echo "linuxbrew ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 fi
 
+# Ensure /home/linuxbrew is owned by linuxbrew
+mkdir -p /home/linuxbrew
+chown -R linuxbrew:linuxbrew /home/linuxbrew
+
 if [ ! -d /home/linuxbrew/.linuxbrew ]; then
-  (cd /home/linuxbrew && sudo -u linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)")
+  (cd /home/linuxbrew && sudo -u linuxbrew -H HOME=/home/linuxbrew NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)")
 fi
 
 # Set up brew environment for the rest of this script
@@ -62,15 +66,20 @@ echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' > /etc/profile.d/h
 
 # --- install nerdctl + buildkit via brew ---
 log "==> installing nerdctl + buildkit + jq via brew"
-(cd /home/linuxbrew && sudo -u linuxbrew -H /home/linuxbrew/.linuxbrew/bin/brew install nerdctl buildkit cni-plugins jq)
+(cd /home/linuxbrew && sudo -u linuxbrew -H HOME=/home/linuxbrew /home/linuxbrew/.linuxbrew/bin/brew install nerdctl buildkit jq)
+
+# --- install cni-plugins manually ---
+log "==> installing cni-plugins"
+CNI_PLUGINS_VERSION="v1.6.2"
+ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+mkdir -p /opt/cni/bin
+curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/cni-plugins-linux-${ARCH}-${CNI_PLUGINS_VERSION}.tgz" | tar -C /opt/cni/bin -xz
 
 # Symlink for sudo and systemd
 ln -sf /home/linuxbrew/.linuxbrew/bin/nerdctl /usr/local/bin/nerdctl
 ln -sf /home/linuxbrew/.linuxbrew/bin/buildkitd /usr/local/bin/buildkitd
 ln -sf /home/linuxbrew/.linuxbrew/bin/buildctl /usr/local/bin/buildctl
 ln -sf /home/linuxbrew/.linuxbrew/bin/jq /usr/local/bin/jq
-mkdir -p /opt/cni/bin
-ln -sf /home/linuxbrew/.linuxbrew/opt/cni-plugins/bin/* /opt/cni/bin/
 
 # Create buildkit systemd service
 cat > /etc/systemd/system/buildkit.service << 'EOF'

@@ -17,6 +17,7 @@ defmodule PushServer.Repo do
   def update_preference(user_id, pref), do: GenServer.call(__MODULE__, {:update_preference, user_id, pref})
   def update_buffer_seconds(user_id, seconds), do: GenServer.call(__MODULE__, {:update_buffer_seconds, user_id, seconds})
   def count_active_users(), do: GenServer.call(__MODULE__, :count_active_users)
+  def get_all_active(), do: GenServer.call(__MODULE__, :get_all_active)
 
   @impl true
   def init(_) do
@@ -141,6 +142,19 @@ defmodule PushServer.Repo do
       result ->
         Logger.warning("Unexpected count result: #{inspect(result)}")
         {:reply, 0, db}
+    end
+  end
+
+  def handle_call(:get_all_active, _from, db) do
+    case Exqlite.Basic.exec(db, "SELECT * FROM users WHERE active = 1", []) do
+      {:ok, _, %{rows: rows, columns: cols}, _} ->
+        users = Enum.map(rows, fn row -> Enum.zip(cols, row) |> Map.new() end)
+        {:reply, {:ok, users}, db}
+      {:ok, %{rows: rows, columns: cols}} ->
+        users = Enum.map(rows, fn row -> Enum.zip(cols, row) |> Map.new() end)
+        {:reply, {:ok, users}, db}
+      _ ->
+        {:reply, {:ok, []}, db}
     end
   end
 end

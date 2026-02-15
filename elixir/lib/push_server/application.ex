@@ -8,6 +8,7 @@ defmodule PushServer.Application do
       PushServer.Buffer,
       PushServer.Telemetry,
       PushServer.Worker.DeliveryWorker,
+      PushServer.Worker.PingWorker,
       PushServer.Web.Endpoint,
     ]
 

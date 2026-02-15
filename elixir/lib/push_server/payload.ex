@@ -74,6 +74,20 @@ defmodule PushServer.Payload do
     }
   end
 
+  @doc """
+  Create a minimal "ping" payload to check for 410 Gone without bothering the user.
+  """
+  def ping(user_id) do
+    %{
+      title: "",
+      body: "",
+      tag: "ping-#{user_id}",
+      silent: true,
+      renotify: false,
+      data: %{type: "ping"}
+    }
+  end
+
   # --- Private: title per type ---
 
   defp title("mention", body),  do: "#{username(body)} mentioned you"

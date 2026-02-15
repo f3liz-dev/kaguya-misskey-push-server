@@ -119,12 +119,15 @@ defmodule PushServer.Repo do
   end
 
   def handle_call(:count_active_users, _from, db) do
+    Logger.debug("Repo: Counting active users...")
     case Exqlite.Basic.exec(db, "SELECT COUNT(*) FROM users WHERE active = 1", []) do
       {:ok, _, %{rows: [[n]]}, _} ->
         count = if is_binary(n), do: String.to_integer(n), else: n
+        Logger.debug("Repo: Active users count = #{count}")
         {:reply, count, db}
       {:ok, %{rows: [[n]]}} -> 
         count = if is_binary(n), do: String.to_integer(n), else: n
+        Logger.debug("Repo: Active users count = #{count}")
         {:reply, count, db}
       result ->
         Logger.warning("Unexpected count result: #{inspect(result)}")

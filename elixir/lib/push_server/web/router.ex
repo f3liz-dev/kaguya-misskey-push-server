@@ -44,11 +44,11 @@ defmodule PushServer.Web.Router do
   end
 
   post "/register" do
-    Logger.info("Register request received: #{inspect(conn.body_params)}")
+    Logger.info("Register request received")
     with {:ok, body} <- validate_register(conn.body_params),
          :ok <- PushServer.Repo.insert_user(body) do
-      Logger.info("Registration successful for user: #{body.id}")
-      send_json(conn, 200, %{ok: true})
+      Logger.info("Registration successful for user: #{body.id} (Misskey ID: #{body.webhook_user_id})")
+      send_json(conn, 200, %{ok: true, id: body.id})
     else
       {:error, :invalid} -> 
         Logger.warning("Registration failed: invalid request body")
@@ -63,25 +63,41 @@ defmodule PushServer.Web.Router do
   end
 
   delete "/unregister" do
-    if id = conn.body_params["user_id"] do
+    id = conn.body_params["user_id"] || conn.body_params["id"]
+    secret_header = get_req_header(conn, "x-misskey-hook-secret") |> List.first()
+
+    with not is_nil(id) <- true,
+         {:ok, user} when not is_nil(user) <- PushServer.Repo.get_user(id),
+         true <- secret_header == user["webhook_secret"] do
       PushServer.Repo.delete_user(id)
       send_json(conn, 200, %{ok: true})
     else
-      send_json(conn, 400, %{error: "missing user_id"})
+      false -> send_json(conn, 400, %{error: "missing id"})
+      _ -> send_json(conn, 403, %{error: "unauthorized"})
     end
   end
 
   patch "/settings" do
-    user_id = conn.body_params["user_id"]
+    id = conn.body_params["user_id"] || conn.body_params["id"]
+    secret_header = get_req_header(conn, "x-misskey-hook-secret") |> List.first()
+    
     delay = conn.body_params["delay_minutes"]
     pref = conn.body_params["notification_preference"]
     buffer = conn.body_params["buffer_seconds"]
 
-    if delay, do: PushServer.Repo.update_delay(user_id, delay)
-    if pref, do: PushServer.Repo.update_preference(user_id, pref)
-    if buffer, do: PushServer.Repo.update_buffer_seconds(user_id, buffer)
-    
-    send_json(conn, 200, %{ok: true})
+    with not is_nil(id) <- true,
+         {:ok, user} when not is_nil(user) <- PushServer.Repo.get_user(id),
+         true <- secret_header == user["webhook_secret"] do
+      
+      if delay, do: PushServer.Repo.update_delay(id, delay)
+      if pref, do: PushServer.Repo.update_preference(id, pref)
+      if buffer, do: PushServer.Repo.update_buffer_seconds(id, buffer)
+      
+      send_json(conn, 200, %{ok: true})
+    else
+      false -> send_json(conn, 400, %{error: "missing id"})
+      _ -> send_json(conn, 403, %{error: "unauthorized"})
+    end
   end
 
   get "/health" do
@@ -108,7 +124,7 @@ defmodule PushServer.Web.Router do
   match _, do: send_resp(conn, 404, "not found")
 
   defp validate_register(p) do
-    required = ["id", "misskey_origin", "webhook_user_id", "webhook_secret", "push_subscription"]
+    required = ["misskey_origin", "webhook_user_id", "webhook_secret", "push_subscription"]
     missing = Enum.filter(required, fn key -> !Map.has_key?(p, key) end)
     
     if Enum.empty?(missing) do
@@ -116,9 +132,12 @@ defmodule PushServer.Web.Router do
         val when is_integer(val) -> max(0, min(val, 600))
         _ -> 60
       end
+
+      # Generate a random public ID for the webhook URL
+      id = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
       
       {:ok, %{
-        id: p["id"],
+        id: id,
         misskey_origin: p["misskey_origin"],
         webhook_user_id: p["webhook_user_id"],
         webhook_secret: p["webhook_secret"],

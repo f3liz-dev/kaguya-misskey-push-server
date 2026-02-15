@@ -74,18 +74,11 @@ defmodule PushServer.Repo do
   end
 
   def handle_call({:insert_user, user}, _from, db) do
-    Logger.info("Repo: Attempting to insert/update user #{user.id}")
+    Logger.info("Repo: Attempting to insert registration #{user.id}")
     buffer_seconds = Map.get(user, :buffer_seconds, 60)
     res = Exqlite.Basic.exec(db, """
       INSERT INTO users (id, misskey_origin, webhook_user_id, webhook_secret, push_subscription, notification_preference, delay_minutes, buffer_seconds, active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-      ON CONFLICT(id) DO UPDATE SET
-        webhook_secret = excluded.webhook_secret,
-        push_subscription = excluded.push_subscription,
-        notification_preference = excluded.notification_preference,
-        delay_minutes = excluded.delay_minutes,
-        buffer_seconds = excluded.buffer_seconds,
-        active = 1
     """, [user.id, user.misskey_origin, user.webhook_user_id, user.webhook_secret, Jason.encode!(user.push_subscription), user.notification_preference, user.delay_minutes, buffer_seconds])
     
     case res do

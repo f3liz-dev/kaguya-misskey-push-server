@@ -34,6 +34,7 @@ defmodule PushServer.Web.Router do
       buffer_seconds = Map.get(user, "buffer_seconds", 60)
       deliver_at = DateTime.utc_now() |> DateTime.add(buffer_seconds, :second)
       
+      Logger.info("Webhook received: user_id=#{user_id} type=#{conn.body_params["type"]} buffer=#{buffer_seconds}s")
       :telemetry.execute([:push_server, :webhook, :arrival], %{count: 1}, %{type: conn.body_params["type"]})
       PushServer.Buffer.insert(user_id, payload, deliver_at)
       send_resp(conn, 200, "ok")

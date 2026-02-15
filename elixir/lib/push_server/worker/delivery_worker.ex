@@ -37,6 +37,7 @@ defmodule PushServer.Worker.DeliveryWorker do
 
         case PushServer.WebPush.send(subscription, summary) do
           :ok ->
+            Logger.info("Notification delivered: user_id=#{user_id} count=#{length(rows)}")
             :telemetry.execute([:push_server, :delivery, :success], %{count: 1})
             cleanup(rows)
           {:error, :gone} ->

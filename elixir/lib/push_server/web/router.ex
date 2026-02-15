@@ -66,14 +66,16 @@ defmodule PushServer.Web.Router do
     id = conn.body_params["user_id"] || conn.body_params["id"]
     secret_header = get_req_header(conn, "x-misskey-hook-secret") |> List.first()
 
-    with not is_nil(id) <- true,
-         {:ok, user} when not is_nil(user) <- PushServer.Repo.get_user(id),
-         true <- secret_header == user["webhook_secret"] do
-      PushServer.Repo.delete_user(id)
-      send_json(conn, 200, %{ok: true})
+    if is_nil(id) do
+      send_json(conn, 400, %{error: "missing id"})
     else
-      false -> send_json(conn, 400, %{error: "missing id"})
-      _ -> send_json(conn, 403, %{error: "unauthorized"})
+      with {:ok, user} when not is_nil(user) <- PushServer.Repo.get_user(id),
+           true <- secret_header == user["webhook_secret"] do
+        PushServer.Repo.delete_user(id)
+        send_json(conn, 200, %{ok: true})
+      else
+        _ -> send_json(conn, 403, %{error: "unauthorized"})
+      end
     end
   end
 
@@ -85,18 +87,20 @@ defmodule PushServer.Web.Router do
     pref = conn.body_params["notification_preference"]
     buffer = conn.body_params["buffer_seconds"]
 
-    with not is_nil(id) <- true,
-         {:ok, user} when not is_nil(user) <- PushServer.Repo.get_user(id),
-         true <- secret_header == user["webhook_secret"] do
-      
-      if delay, do: PushServer.Repo.update_delay(id, delay)
-      if pref, do: PushServer.Repo.update_preference(id, pref)
-      if buffer, do: PushServer.Repo.update_buffer_seconds(id, buffer)
-      
-      send_json(conn, 200, %{ok: true})
+    if is_nil(id) do
+      send_json(conn, 400, %{error: "missing id"})
     else
-      false -> send_json(conn, 400, %{error: "missing id"})
-      _ -> send_json(conn, 403, %{error: "unauthorized"})
+      with {:ok, user} when not is_nil(user) <- PushServer.Repo.get_user(id),
+           true <- secret_header == user["webhook_secret"] do
+        
+        if delay, do: PushServer.Repo.update_delay(id, delay)
+        if pref, do: PushServer.Repo.update_preference(id, pref)
+        if buffer, do: PushServer.Repo.update_buffer_seconds(id, buffer)
+        
+        send_json(conn, 200, %{ok: true})
+      else
+        _ -> send_json(conn, 403, %{error: "unauthorized"})
+      end
     end
   end
 

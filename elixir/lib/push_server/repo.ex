@@ -25,6 +25,7 @@ defmodule PushServer.Repo do
     Logger.info("Repo: Opening database at #{db_path}")
     {:ok, db} = Exqlite.Basic.open(db_path)
     
+    # Create table
     Exqlite.Basic.exec(db, """
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -40,11 +41,26 @@ defmodule PushServer.Repo do
       )
     """, [])
     
-    # Add buffer_seconds column if it doesn't exist (migration for existing DBs)
-    Exqlite.Basic.exec(db, """
-      ALTER TABLE users ADD COLUMN buffer_seconds INTEGER NOT NULL DEFAULT 60
-    """, [])
-
+    # Migration: Add buffer_seconds if it doesn't exist (ignore error if already exists)
+    case Exqlite.Basic.exec(db, "PRAGMA table_info(users)", []) do
+      {:ok, _, %{rows: rows}, _} when is_list(rows) ->
+        has_buffer_seconds = Enum.any?(rows, fn row ->
+          Enum.at(row, 1) == "buffer_seconds"
+        end)
+        unless has_buffer_seconds do
+          Logger.info("Repo: Adding buffer_seconds column (migration)")
+          Exqlite.Basic.exec(db, """
+            ALTER TABLE users ADD COLUMN buffer_seconds INTEGER NOT NULL DEFAULT 60
+          """, [])
+        end
+      _ ->
+        # If we can't check, just try the ALTER and ignore errors
+        Exqlite.Basic.exec(db, """
+          ALTER TABLE users ADD COLUMN buffer_seconds INTEGER NOT NULL DEFAULT 60
+        """, [])
+    end
+    
+    Logger.info("Repo: Database ready")
     {:ok, db}
   end
 

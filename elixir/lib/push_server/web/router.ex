@@ -84,10 +84,23 @@ defmodule PushServer.Web.Router do
   end
 
   get "/health" do
+    # Safely get metrics, default to 0 if not ready
+    active_users = try do
+      PushServer.Repo.count_active_users()
+    rescue
+      _ -> 0
+    end
+    
+    buffered_notifications = try do
+      PushServer.Buffer.get_due() |> length()
+    rescue
+      _ -> 0
+    end
+    
     send_json(conn, 200, %{
       status: "ok",
-      active_users: PushServer.Repo.count_active_users(),
-      buffered_notifications: length(PushServer.Buffer.get_due())
+      active_users: active_users,
+      buffered_notifications: buffered_notifications
     })
   end
 

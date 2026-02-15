@@ -42,7 +42,7 @@ defmodule PushServer.WebPush do
         {:ok, %{status: 410}} ->
           {:error, :gone}
         {:ok, %{status: s}} ->
-          Logger.warning("push endpoint unexpected status", status: s)
+          Logger.warning("push endpoint unexpected status: #{s}", status: s)
           {:error, {:status, s}}
         {:error, reason} ->
           Logger.warning("push endpoint request failed", reason: inspect(reason))
@@ -50,11 +50,8 @@ defmodule PushServer.WebPush do
       end
     rescue
       e -> 
-        Logger.error("encryption or dispatch failed", 
-          error: Exception.message(e),
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__),
-          endpoint: endpoint
-        )
+        Logger.error("encryption or dispatch failed: #{Exception.message(e)}")
+        Logger.debug("Stacktrace: #{Exception.format_stacktrace(__STACKTRACE__)}")
         {:error, :encryption_failed}
     end
   end
@@ -86,10 +83,10 @@ defmodule PushServer.WebPush do
     }
   end
 
-  defp import_vapid_private_key(b64), do: b64 |> b64decode() |> :binary.bin_to_list()
+  defp import_vapid_private_key(b64), do: b64decode(b64)
 
   defp der_to_raw_sig(der) do
-    {:ECDSASignature, r, s} = :public_key.der_decode(:ECDSASignature, der)
+    {:"ECDSA-Sig-Value", r, s} = :public_key.der_decode(:"ECDSA-Sig-Value", der)
     r_bin = :binary.encode_unsigned(r) |> pad_to(32)
     s_bin = :binary.encode_unsigned(s) |> pad_to(32)
     r_bin <> s_bin

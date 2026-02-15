@@ -32,7 +32,7 @@ defmodule PushServer.Worker.DeliveryWorker do
     case PushServer.Repo.get_user(user_id) do
       {:ok, user} when not is_nil(user) ->
         payloads = Enum.map(rows, fn {_, _, payload, _, _} -> payload end)
-        summary = PushServer.Payload.summarize(payloads)
+        summary = PushServer.Payload.summarize(payloads, user_id)
         subscription = Jason.decode!(user["push_subscription"])
 
         case PushServer.WebPush.send(subscription, summary) do

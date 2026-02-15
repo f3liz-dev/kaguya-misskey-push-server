@@ -28,7 +28,7 @@ defmodule PushServer.Web.Router do
     with {:ok, user} when not is_nil(user) <- PushServer.Repo.get_user(user_id),
          true <- user["active"] == 1,
          true <- secret_header == user["webhook_secret"],
-         {:ok, payload} <- PushServer.Payload.build(conn.body_params, user["notification_preference"]) do
+         {:ok, payload} <- PushServer.Payload.build(conn.body_params, user["notification_preference"], user_id) do
       
       # Use buffer_seconds for collection time (0-600s), default to 60s
       buffer_seconds = Map.get(user, "buffer_seconds", 60)

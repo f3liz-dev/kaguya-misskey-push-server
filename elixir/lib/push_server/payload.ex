@@ -22,13 +22,13 @@ defmodule PushServer.Payload do
   Build a single push payload from a Misskey webhook body.
   Returns {:ok, payload} or {:error, :unexpected_shape}.
   """
-  def build(params, preference) do
+  def build(params, preference, user_id) do
     case params do
       %{"type" => type, "body" => body} ->
         payload = %{
           title: title(type, body),
           body: body_text(type, body),
-          tag: body["id"] || tag(type, body),
+          tag: (body["id"] || tag(type, body)) <> "-#{user_id}",
           silent: silent?(type, preference),
           renotify: false,
           data: %{
@@ -54,9 +54,9 @@ defmodule PushServer.Payload do
   Summarize multiple payloads into one calm grouped notification.
   Single payload passes through unchanged.
   """
-  def summarize([single]), do: single
+  def summarize([single], _user_id), do: single
 
-  def summarize(payloads) do
+  def summarize(payloads, user_id) do
     counts = Enum.frequencies_by(payloads, & &1.data.type)
 
     body =
@@ -67,7 +67,7 @@ defmodule PushServer.Payload do
     %{
       title: "#{length(payloads)} new notifications",
       body: body,
-      tag: "summary",
+      tag: "summary-#{user_id}",
       silent: true,   # summary is always silent — it's a report, not an alert
       renotify: false,
       data: %{type: "summary"}
